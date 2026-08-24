@@ -3,8 +3,9 @@ import {
   Menu, Search, Calendar as CalendarIcon, HelpCircle, Plus, X, ChevronLeft, ChevronRight,
   Home as HomeIcon, UtensilsCrossed, Car, HeartPulse, GraduationCap, PartyPopper, Coffee,
   PiggyBank, Wallet, CreditCard, Landmark, ListChecks, LayoutGrid, BarChart3, Trash2, Check,
-  ArrowLeft, TrendingUp
+  ArrowLeft, TrendingUp, Download
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 
 // ---------------------------------------------------------------------------
@@ -155,6 +156,25 @@ const todayKey = () => toKey(new Date());
 const fmt = (n) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(n || 0);
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
+function exportToExcel(transactions) {
+  const rows = [...transactions]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(t => ({
+      Fecha: t.date,
+      'Macro-Categoría': t.macro,
+      Subcategoría: t.sub,
+      'Cuenta de Pago': t.account,
+      'Monto (MXN)': t.amount,
+      Nota: t.note || '',
+    }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{ wch: 12 }, { wch: 24 }, { wch: 34 }, { wch: 22 }, { wch: 12 }, { wch: 28 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Registro de Gastos');
+  const fecha = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `gastos_${fecha}.xlsx`);
+}
+
 function weekStrip(centerKey) {
   const center = fromKey(centerKey);
   const days = [];
@@ -282,6 +302,7 @@ export default function GastosApp() {
         {tab === 'resumen' && (
           <ResumenView
             monthTx={monthTx} monthTotal={monthTotal} remaining={remaining}
+            allTransactions={transactions}
             monthLabel={`${MONTHS[fromKey(selectedDate).getMonth()]} ${fromKey(selectedDate).getFullYear()}`}
             onAdd={() => setAddOpen(true)}
           />
@@ -553,7 +574,7 @@ function CalendarioView({ calMonth, setCalMonth, transactions, onSelectDay, onAd
 // ---------------------------------------------------------------------------
 // Vista: Resumen
 // ---------------------------------------------------------------------------
-function ResumenView({ monthTx, monthTotal, remaining, monthLabel, onAdd }) {
+function ResumenView({ monthTx, monthTotal, remaining, allTransactions, monthLabel, onAdd }) {
   const pct = TOTAL_BUDGET > 0 ? Math.min(monthTotal / TOTAL_BUDGET, 1) : 0;
   const over = monthTotal > TOTAL_BUDGET;
 
@@ -568,7 +589,20 @@ function ResumenView({ monthTx, monthTotal, remaining, monthLabel, onAdd }) {
   return (
     <div className="flex-1 pb-24">
       <TopBar title="Resumen" />
-      <div className="px-5 -mt-1 mb-4 text-neutral-500 text-sm">{monthLabel}</div>
+      <div className="px-5 -mt-1 mb-4 flex items-center justify-between">
+        <span className="text-neutral-500 text-sm">{monthLabel}</span>
+        <button
+          onClick={() => exportToExcel(allTransactions)}
+          disabled={allTransactions.length === 0}
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
+          style={{
+            backgroundColor: allTransactions.length === 0 ? '#171717' : '#dc262620',
+            color: allTransactions.length === 0 ? '#525252' : '#ef4444',
+          }}
+        >
+          <Download size={13} /> Exportar a Excel
+        </button>
+      </div>
 
       <div className="mx-4 rounded-2xl p-5 mb-5" style={{ backgroundColor: '#171717' }}>
         <div className="text-neutral-500 text-sm">Presupuesto restante</div>
